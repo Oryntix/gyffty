@@ -254,3 +254,37 @@ def test_duplicate_coupon_codes_are_rejected(
         },
     )
     assert response.status_code == 409
+
+
+# ------------------------------------------------- env-var list parsing
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("*.onrender.com", ["*.onrender.com"]),
+        ("a.com,b.com", ["a.com", "b.com"]),
+        ("a.com, b.com ", ["a.com", "b.com"]),
+        ('["a.com","b.com"]', ["a.com", "b.com"]),
+        ("single.host", ["single.host"]),
+    ],
+)
+def test_list_env_vars_parse_from_the_environment(monkeypatch, raw, expected) -> None:
+    """Regression: these must be read from the ENVIRONMENT, not init kwargs.
+
+    pydantic-settings runs json.loads() on list-typed fields before any
+    validator. `ALLOWED_HOSTS=*.onrender.com` therefore died at startup with
+    "Expecting value: line 1 column 1" — while passing the same value as an
+    init kwarg worked fine, which is exactly why the bug reached production.
+    """
+    monkeypatch.setenv("ALLOWED_HOSTS", raw)
+    monkeypatch.setenv("BACKEND_CORS_ORIGINS", raw)
+    settings = Settings(_env_file=None)
+    assert settings.ALLOWED_HOSTS == expected
+    assert settings.BACKEND_CORS_ORIGINS == expected
+
+
+def test_malformed_json_list_reports_clearly(monkeypatch) -> None:
+    monkeypatch.setenv("ALLOWED_HOSTS", '["unclosed"')
+    with pytest.raises(ValueError, match="JSON array"):
+        Settings(_env_file=None)

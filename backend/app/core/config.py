@@ -9,10 +9,10 @@ default signing key.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, computed_field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 INSECURE_SECRETS = {
     "dev-secret-key-not-for-production",
@@ -47,7 +47,8 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     BCRYPT_ROUNDS: int = 12
     # Hosts this API will answer for. ["*"] is rejected in production.
-    ALLOWED_HOSTS: list[str] = Field(default_factory=lambda: ["*"])
+    # NoDecode: see _split_csv below.
+    ALLOWED_HOSTS: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["*"])
     FORCE_HTTPS: bool = False
 
     # ---- Database ---------------------------------------------------
@@ -67,7 +68,7 @@ class Settings(BaseSettings):
     REDIS_URL: str | None = None
 
     # ---- CORS -------------------------------------------------------
-    BACKEND_CORS_ORIGINS: list[str] = Field(
+    BACKEND_CORS_ORIGINS: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
     )
 
@@ -114,9 +115,25 @@ class Settings(BaseSettings):
     @field_validator("BACKEND_CORS_ORIGINS", "ALLOWED_HOSTS", mode="before")
     @classmethod
     def _split_csv(cls, v: object) -> object:
-        """Accept both a JSON array and a plain comma-separated string."""
-        if isinstance(v, str) and not v.startswith("["):
-            return [item.strip() for item in v.split(",") if item.strip()]
+        """Accept a JSON array or a plain comma-separated string.
+
+        These fields are marked NoDecode so pydantic-settings hands us the raw
+        environment string. Otherwise it tries json.loads() first and a value
+        like `*.onrender.com` dies with "Expecting value: line 1 column 1"
+        before this validator ever runs.
+        """
+        if isinstance(v, str):
+            text = v.strip()
+            if text.startswith("["):
+                import json
+
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(
+                        f"Looks like a JSON array but will not parse: {text!r}"
+                    ) from exc
+            return [item.strip() for item in text.split(",") if item.strip()]
         return v
 
     @computed_field
