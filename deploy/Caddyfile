@@ -1,0 +1,31 @@
+# Caddy terminates TLS (certificates are obtained and renewed automatically)
+# and is the only process exposed to the internet.
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	# Next already sets its own security headers; strip the server banner here.
+	header {
+		-Server
+	}
+
+	reverse_proxy web:3000 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		-Server
+	}
+
+	# Rate limiting in the API trusts X-Forwarded-For, so the proxy must set it
+	# itself rather than passing a client-supplied value through.
+	reverse_proxy api:8000 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

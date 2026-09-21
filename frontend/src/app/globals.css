@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --header-height: 118px;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-bone text-ink font-sans antialiased;
+  }
+
+  ::selection {
+    @apply bg-noir-800 text-gold-200;
+  }
+
+  /* Horizontal product rails scroll rather than wrap; hide the scrollbar chrome. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-gold-500 ring-offset-2 ring-offset-bone;
+  }
+}
+
+@layer components {
+  .eyebrow {
+    @apply text-eyebrow font-semibold uppercase tracking-[0.22em] text-gold-600;
+  }
+
+  /* The thin foil rule that sits under every section heading. */
+  .gold-rule::after {
+    content: '';
+    @apply mt-4 block h-px w-14 bg-foil-rule;
+  }
+
+  /* Metallic sheen, using the same gradient ramp as the brand seal.
+     Reserved for the wordmark and display headings on charcoal. */
+  .text-foil {
+    @apply bg-foil bg-clip-text text-transparent;
+  }
+
+  .card-hover {
+    @apply transition-all duration-500 ease-silk hover:-translate-y-1 hover:shadow-lift;
+  }
+
+  /* Long-form copy: policies, help and company pages. */
+  .prose-gyffty h2 {
+    @apply scroll-mt-32;
+  }
+  .prose-gyffty a {
+    @apply underline-offset-2;
+  }
+  .prose-gyffty ul {
+    @apply marker:text-gold-500;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden bg-line/60;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/60 to-transparent;
+  }
+}

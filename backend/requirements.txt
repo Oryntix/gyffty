@@ -1,0 +1,29 @@
+# ---- Web framework ----
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+gunicorn==23.0.0
+python-multipart==0.0.20
+
+# ---- Validation / settings ----
+pydantic==2.10.4
+pydantic-settings==2.7.1
+email-validator==2.2.0
+
+# ---- Database ----
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg[binary,pool]==3.2.3
+
+# ---- Security ----
+# NOTE: passlib 1.7.4 reads bcrypt.__about__, which bcrypt 4.1+ removed.
+# Pinning bcrypt to 4.0.1 keeps the pair working; do not bump one alone.
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+
+# ---- Infrastructure ----
+redis==5.2.1
+httpx==0.28.1
+structlog==24.4.0
+python-slugify==8.0.4
+sentry-sdk[fastapi]==2.19.2

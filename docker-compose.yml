@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gyffty
+      POSTGRES_PASSWORD: gyffty
+      POSTGRES_DB: gyffty
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gyffty']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://gyffty:gyffty@db:5432/gyffty
+      SECRET_KEY: change-me-in-production
+      ENVIRONMENT: development
+      BACKEND_CORS_ORIGINS: '["http://localhost:3000"]'
+    ports:
+      - '8000:8000'
+    depends_on:
+      db:
+        condition: service_healthy
+    # Create the schema and load the demo catalogue on first boot.
+    command: >
+      sh -c "python -m app.db.init_db &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  web:
+    build: ./frontend
+    environment:
+      # Server components talk to the API over the compose network,
+      # the browser talks to it through the published port.
+      API_BASE_URL: http://api:8000/api/v1
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api/v1
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    ports:
+      - '3000:3000'
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

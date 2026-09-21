@@ -1,0 +1,142 @@
+# Render Blueprint.
+#
+# ONE repo, ONE blueprint, THREE services. You do not create separate projects
+# for the frontend and backend — Render reads this file and provisions all of
+# them together, and redeploys whichever one you changed.
+#
+#   Render dashboard -> New -> Blueprint -> pick this repo -> Apply
+#
+# Values marked `sync: false` are prompted for once at deploy time and never
+# stored in git. Everything else is safe to keep here.
+#
+# region: singapore is Render's closest point of presence to the Supabase
+# project. Every query the API makes crosses that link, so it is the most
+# consequential line in this file.
+
+services:
+  # ------------------------------------------------------------------ API --
+  - name: gyffty-api
+    type: web
+    runtime: docker
+    region: singapore
+    # `free` spins down after 15 minutes idle (~50s cold start on the next
+    # visit). Move to 0.5c-512mb (~$7/mo) before you send the link to anyone.
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+
+      # The app refuses to boot if this is a placeholder or under 32 chars.
+      #   python -c "import secrets; print(secrets.token_hex(32))"
+      - key: SECRET_KEY
+        generateValue: true
+
+      # MUST be the session pooler. The direct host db.<ref>.supabase.co is
+      # IPv6-only and Render cannot reach it. Port 5432, not 6543: transaction
+      # pooling breaks the prepared statements SQLAlchemy relies on.
+      #   postgresql+psycopg://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+
+      - key: DB_POOL_SIZE
+        value: "5"
+      - key: DB_MAX_OVERFLOW
+        value: "5"
+      # Worth the extra round trip in production: a silently dropped
+      # connection is a 500 for a customer.
+      - key: DB_POOL_PRE_PING
+        value: "true"
+
+      - key: REDIS_URL
+        fromDatabase:
+          name: gyffty-cache
+          property: connectionString
+
+      # Fill these in after the first deploy, once Render has assigned the
+      # onrender.com hostnames. The API rejects requests from anywhere else.
+      - key: BACKEND_CORS_ORIGINS
+        sync: false # https://gyffty-web.onrender.com
+      - key: ALLOWED_HOSTS
+        sync: false # gyffty-api.onrender.com
+      - key: STOREFRONT_URL
+        sync: false # https://gyffty-web.onrender.com
+
+      - key: FORCE_HTTPS
+        value: "true"
+      # Keeps the OpenAPI schema private. Set true if you want /docs live.
+      - key: ENABLE_DOCS
+        value: "false"
+      # One worker fits the 512MB free tier. Raise to 2-4 with the plan.
+      - key: WEB_CONCURRENCY
+        value: "1"
+
+      # Checkout works end to end on the mock provider; swap when keys exist.
+      - key: PAYMENT_PROVIDER
+        value: mock
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+      # Receipts are written to the logs until SMTP is configured.
+      - key: EMAIL_BACKEND
+        value: console
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        value: Gyffty <care@gyffty.com>
+
+      - key: SENTRY_DSN
+        sync: false
+
+  # ----------------------------------------------------------- storefront --
+  - name: gyffty-web
+    type: web
+    runtime: docker
+    region: singapore
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    healthCheckPath: /
+    autoDeploy: true
+
+    envVars:
+      # NEXT_PUBLIC_* is compiled into the browser bundle at BUILD time, so
+      # Render passes it as a Docker build arg. Changing one needs a rebuild,
+      # not a restart — a plain "Restart service" will not pick it up.
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false # https://gyffty-api.onrender.com/api/v1
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false # https://gyffty-web.onrender.com
+      # Used by server components, read at runtime.
+      - key: API_BASE_URL
+        sync: false # https://gyffty-api.onrender.com/api/v1
+      - key: NODE_ENV
+        value: production
+
+  # ---------------------------------------------------------------- cache --
+  # Without this the API falls back to per-process rate limiting and token
+  # revocation, which stops being correct as soon as there is more than one
+  # instance. /api/v1/health/ready reports "redis: degraded" when it is absent.
+  - name: gyffty-cache
+    type: keyvalue
+    region: singapore
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    # Internal network only; nothing outside Render can reach it.
+    ipAllowList: []

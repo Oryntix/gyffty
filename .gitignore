@@ -1,0 +1,62 @@
+# Root ignore rules. The per-package .gitignore files cover their own trees;
+# these are the belt-and-braces rules that apply everywhere, so a secret
+# cannot be committed just because it was written in an unexpected directory.
+
+# ---- Secrets. Never commit these. -----------------------------------------
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.local.example
+!.env.production.example
+*.pem
+*.key
+!**/*.key.example
+secrets.json
+credentials.json
+
+# ---- Local databases -------------------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ---- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ---- Node / Next.js --------------------------------------------------------
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+
+# ---- Editors and OS --------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# ---- Logs and scratch ------------------------------------------------------
+*.log
+npm-debug.log*
+tmp/
+scratch/
